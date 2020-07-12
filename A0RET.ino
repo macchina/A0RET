@@ -39,6 +39,7 @@ This code is now all specialized for the A0 and its ESP32 WRover-B which has 4MB
 #include "wifi.h"
 #include "gvret_comm.h"
 #include "can_manager.h"
+#include "lawicel.h"
 
 byte i = 0;
 
@@ -58,6 +59,7 @@ WiFiManager wifiManager;
 GVRET_Comm_Handler serialGVRET; //gvret protocol over the serial to USB connection
 GVRET_Comm_Handler wifiGVRET; //GVRET over the wifi telnet port
 CANManager canManager; //keeps track of bus load and abstracts away some details of how things are done
+LAWICELHandler lawicel;
 
 SerialConsole console;
 
@@ -74,7 +76,9 @@ void loadSettings()
     settings.CAN0ListenOnly = nvPrefs.getBool("can0-listenonly", false);
     settings.useBinarySerialComm = nvPrefs.getBool("binarycomm", false);
     settings.logLevel = nvPrefs.getUChar("loglevel", 1); //info
-    settings.wifiMode = nvPrefs.getUChar("wifiMode", 0); //Wifi defaults to being off
+    settings.wifiMode = nvPrefs.getUChar("wifiMode", 2); //Wifi defaults to creating an AP
+    settings.enableBT = nvPrefs.getBool("enable-bt", false);
+    settings.enableLawicel = nvPrefs.getBool("enableLawicel", true);
     if (nvPrefs.getString("SSID", settings.SSID, 32) == 0)
     {
         strcpy(settings.SSID, "ESP32DUE");
@@ -83,6 +87,10 @@ void loadSettings()
     if (nvPrefs.getString("wpa2Key", settings.WPA2Key, 64) == 0)
     {
         strcpy(settings.WPA2Key, "aBigSecret");
+    }
+    if (nvPrefs.getString("btname", settings.btName, 32) == 0)
+    {
+        strcpy(settings.btName, "ELM327-A0");
     }
 
     nvPrefs.end();
@@ -111,18 +119,34 @@ void setup()
 {
     //delay(5000); //just for testing. Don't use in production
 
-    Serial.begin(1000000);
+    Serial.begin(1000000); //for production
+    //Serial.begin(115200); //for testing
 
     SysSettings.isWifiConnected = false;
 
     loadSettings();
 
+    //If you enable PSRAM then BluetoothSerial will kill everything via a heap error. These calls
+    //try to debug that. But, no dice yet. :(
+    //heap_caps_print_heap_info(MALLOC_CAP_8BIT);
+
     wifiManager.setup();
+
+    //heap_caps_print_heap_info(MALLOC_CAP_8BIT);
+
+    if (settings.enableBT) 
+    {
+        Serial.println("Starting bluetooth");
+        elmEmulator.setup();
+    }
+
+    //heap_caps_print_heap_info(MALLOC_CAP_8BIT);
 
     Serial.print("Build number: ");
     Serial.println(CFG_BUILD_NUM);
 
     if (settings.CAN0_Enabled) {
+        CAN0.setCANPins(GPIO_NUM_4, GPIO_NUM_5);
         CAN0.enable();
         CAN0.begin(settings.CAN0Speed, 255);
         Serial.print("Enabled CAN0 with speed ");
@@ -137,6 +161,8 @@ void setup()
     {
         CAN0.disable();
     }
+
+    //heap_caps_print_heap_info(MALLOC_CAP_8BIT);
 
     setPromiscuousMode();
 
@@ -170,7 +196,7 @@ void sendMarkTriggered(int which)
     frame.extended = true;
     frame.length = 0;
     frame.rtr = 0;
-    canManager.outputFrame(frame, 0);
+    canManager.displayFrame(frame, 0);
 }
 
 /*
@@ -224,6 +250,5 @@ void loop()
         serialGVRET.processIncomingByte(in_byte);
     }
 
-    //elmEmulator.loop();
-    
+    if (settings.enableBT) elmEmulator.loop();
 }

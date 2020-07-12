@@ -83,6 +83,11 @@ struct EEPROMSettings {
     uint8_t logLevel; //Level of logging to output on serial line
     boolean CAN0ListenOnly; //if true we don't allow any messing with the bus but rather just passively monitor.
 
+    boolean enableBT; //are we enabling bluetooth too?
+    char btName[32];
+
+    boolean enableLawicel;
+
     //if we're using WiFi then output to serial is disabled (it's far too slow to keep up)  
     uint8_t wifiMode; //0 = don't use wifi, 1 = connect to an AP, 2 = Create an AP
     char SSID[32];     //null terminated string for the SSID
@@ -111,6 +116,8 @@ struct SystemSettings {
 class GVRET_Comm_Handler;
 class SerialConsole;
 class CANManager;
+class LAWICELHandler;
+class ELM327Emu;
 
 extern EEPROMSettings settings;
 extern SystemSettings SysSettings;
@@ -119,5 +126,7 @@ extern GVRET_Comm_Handler serialGVRET;
 extern GVRET_Comm_Handler wifiGVRET;
 extern SerialConsole console;
 extern CANManager canManager;
+extern LAWICELHandler lawicel;
+extern ELM327Emu elmEmulator;
 
 #endif /* CONFIG_H_ */
